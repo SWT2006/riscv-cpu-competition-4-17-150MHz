@@ -1,14 +1,15 @@
 `timescale 1ns/1ps
 // 5-stage pipelined RV32IM CPU core.
-// Interface matches the reference myCPU so student_top wiring is identical.
+// Interface matches the fixed top-level contract (reference/student_top(5).sv).
 //   cpu_rst  : active-high synchronous reset
-//   irom_*   : instruction ROM (14-bit word address, combinatorial spo read)
+//   irom_*   : instruction ROM — irom_addr is the full 32-bit PC;
+//              student_top extracts pc[13:2] as the 12-bit IROM word address
 //   perip_*  : peripheral bus — routed to perip_bridge in student_top
 module cpu_core (
     input  wire        cpu_clk,
     input  wire        cpu_rst,
     // IROM
-    output wire [13:0] irom_addr,   // word-addressed (pc[15:2])
+    output wire [31:0] irom_addr,   // full PC; student_top uses irom_addr[13:2]
     input  wire [31:0] irom_data,
     // Peripheral bus (DRAM + MMIO via perip_bridge)
     output wire [31:0] perip_addr,

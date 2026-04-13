@@ -7,8 +7,8 @@ module stage_if (
     input  wire        stall,          // hold PC and IF/ID (load-use hazard)
     input  wire        branch_taken,   // redirect PC
     input  wire [31:0] branch_target,
-    // IROM interface (word-addressed 14-bit index)
-    output wire [13:0] irom_word_addr,
+    // IROM interface — full 32-bit PC; the word address is derived externally
+    output wire [31:0] irom_word_addr,
     input  wire [31:0] irom_data,
     // Outputs to IF/ID pipeline register
     output reg  [31:0] pc_out,
@@ -26,9 +26,10 @@ module stage_if (
             pc_out <= pc_out + 32'd4;
     end
 
-    // IROM: physical word index comes from PC bits [15:2] (14-bit word address).
-    // This maps 0x8000_0000 → word 0, 0x8000_0004 → word 1, etc.
-    assign irom_word_addr = pc_out[15:2];
+    // Expose full PC as the IROM address output.
+    // student_top(5).sv derives the 12-bit IROM word address as pc[13:2].
+    // riscv_soc.v (sim) derives its 13-bit sim_imem word address as pc[14:2].
+    assign irom_word_addr = pc_out;
     assign pc_plus4       = pc_out + 32'd4;
     assign instruction    = irom_data;
 

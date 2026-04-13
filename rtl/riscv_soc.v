@@ -7,7 +7,7 @@
 //   u_soc.u_cpu.u_stage_id.regfile[] – register file inside the pipeline
 //
 // Memory map (ISA test flat binary loaded at word 0):
-//   Instruction fetch : irom_addr[12:0] indexes u_imem.mem
+//   Instruction fetch : irom_addr[14:2] (= pc[14:2]) indexes u_imem.mem
 //   Data load/store   : byte_addr[14:2] indexes u_dmem.mem
 //
 // To support fence_i (self-modifying code), data stores are mirrored into
@@ -152,7 +152,7 @@ module riscv_soc (
     // -----------------------------------------------------------------------
     // CPU ↔ memory wires
     // -----------------------------------------------------------------------
-    wire [13:0] irom_addr;   // 14-bit word address from cpu_core (pc[15:2])
+    wire [31:0] irom_addr;   // full 32-bit PC from cpu_core; sim uses irom_addr[14:2]
     wire [31:0] irom_data;
 
     wire [31:0] perip_addr;
@@ -186,11 +186,12 @@ module riscv_soc (
 
     // -----------------------------------------------------------------------
     // Instruction memory (u_imem)
-    // irom_addr[12:0] covers pc[14:2] (13 bits for 8 K words)
+    // irom_addr is now the full 32-bit PC; pc[14:2] gives the 13-bit word
+    // address for sim_imem (8 K words = 32 KB).
     // -----------------------------------------------------------------------
     sim_imem u_imem (
         .clk    (clk),
-        .raddr  (irom_addr[12:0]),
+        .raddr  (irom_addr[14:2]),
         .rdata  (irom_data),
         .wen    (perip_wen),
         .waddr  (dmem_waddr),

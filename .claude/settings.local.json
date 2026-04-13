@@ -35,7 +35,28 @@
       "Bash(vvp out.vvp +sig_base=2048 +sig_words=36)",
       "Bash(vvp out.vvp +sig_base=2048 +sig_words=34)",
       "Bash(grep -v \"^--$\")",
-      "Bash(vvp out.vvp +sig_base=2048 +sig_words=16)"
+      "Bash(vvp out.vvp +sig_base=2048 +sig_words=16)",
+      "Bash(wc:*)",
+      "Bash(where python3:*)",
+      "Bash(where python:*)",
+      "Bash(py --version)",
+      "Bash(py scripts/coe2hex.py reference_onecycle/irom.coe tb/irom_board.hex)",
+      "Bash(py scripts/coe2hex.py reference_onecycle/dram.coe tb/dram_board.hex)",
+      "Bash(where iverilog:*)",
+      "Bash(iverilog -g2012 -Wall ../rtl/imm_gen.sv ../rtl/control_unit.sv ../rtl/hazard_unit.sv ../rtl/forwarding_unit.sv ../rtl/csr_unit.sv ../rtl/stage_if.sv ../rtl/stage_id.sv ../rtl/stage_ex.sv ../rtl/stage_mem.sv ../rtl/stage_wb.sv ../rtl/pipe_ifid.sv ../rtl/pipe_idex.sv ../rtl/pipe_exmem.sv ../rtl/pipe_memwb.sv ../rtl/cpu_core.sv ../rtl/dram_driver.sv ../rtl/counter.sv ../rtl/display_seg.sv ../rtl/perip_bridge.sv ../rtl/student_top.sv ip_stubs.sv tb_preboard.sv -o tb_preboard.vvp)",
+      "Bash(iverilog -g2012 -o tb/tb_preboard.vvp rtl/imm_gen.sv rtl/control_unit.sv rtl/hazard_unit.sv rtl/forwarding_unit.sv rtl/csr_unit.sv rtl/stage_if.sv rtl/stage_id.sv rtl/stage_ex.sv rtl/stage_mem.sv rtl/stage_wb.sv rtl/pipe_ifid.sv rtl/pipe_idex.sv rtl/pipe_exmem.sv rtl/pipe_memwb.sv rtl/cpu_core.sv rtl/dram_driver.sv rtl/counter.sv rtl/display_seg.sv rtl/perip_bridge.sv rtl/student_top.sv tb/ip_stubs.sv tb/tb_preboard.sv)",
+      "Bash(vvp tb_preboard.vvp)",
+      "Bash(iverilog:*)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(echo \"exit=$?\")",
+      "Bash(py -3 -c \"print\\('hello'\\)\")",
+      "Bash(py:*)",
+      "Read(//c/Users/38560/AppData/Local/Temp/claude//**)",
+      "Read(//c/Users/38560/AppData/Local/Temp/claude/C--Users-38560-Desktop-work-riscv-cpu-competition//**)",
+      "Bash(vvp tb_quick.vvp)",
+      "Bash(echo \"Exit=$?\")",
+      "Bash(ls reference_onecycle/*.sv reference_onecycle/*.v reference_onecycle/*.coe cat reference_onecycle/irom.coe)",
+      "Bash(ls /c/Users/38560/Desktop/work/riscv-cpu-competition/tb/*.coe /c/Users/38560/Desktop/work/riscv-cpu-competition/*.coe /c/Users/38560/Desktop/work/riscv-cpu-competition/rtl/*.coe)"
     ]
   }
 }
