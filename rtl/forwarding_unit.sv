@@ -9,6 +9,7 @@ module forwarding_unit (
     input  wire       exmem_reg_write,
     input  wire [4:0] memwb_rd_addr,
     input  wire       memwb_reg_write,
+    input  wire       memwb_fwd_valid,  // pre-computed: reg_write & (rd != x0)
     output reg  [1:0] forward_a,
     output reg  [1:0] forward_b
 );
@@ -16,7 +17,7 @@ module forwarding_unit (
         // rs1 forwarding
         if (exmem_reg_write && exmem_rd_addr != 5'b0 && exmem_rd_addr == idex_rs1_addr)
             forward_a = 2'b10;
-        else if (memwb_reg_write && memwb_rd_addr != 5'b0 && memwb_rd_addr == idex_rs1_addr)
+        else if (memwb_fwd_valid && memwb_rd_addr == idex_rs1_addr)
             forward_a = 2'b01;
         else
             forward_a = 2'b00;
@@ -24,7 +25,7 @@ module forwarding_unit (
         // rs2 forwarding
         if (exmem_reg_write && exmem_rd_addr != 5'b0 && exmem_rd_addr == idex_rs2_addr)
             forward_b = 2'b10;
-        else if (memwb_reg_write && memwb_rd_addr != 5'b0 && memwb_rd_addr == idex_rs2_addr)
+        else if (memwb_fwd_valid && memwb_rd_addr == idex_rs2_addr)
             forward_b = 2'b01;
         else
             forward_b = 2'b00;

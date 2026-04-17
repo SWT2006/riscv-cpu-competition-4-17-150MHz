@@ -84,10 +84,11 @@ module cpu_core (
     wire [4:0]  memwb_rd_addr;
     wire        memwb_reg_write;
     wire [1:0]  memwb_wb_sel;
-    wire [31:0] memwb_write_data;    // pre-computed WB mux (from pipe_memwb)
+    wire [2:0]  memwb_mem_funct3;    // for WB-stage sign extension
+    wire        memwb_fwd_valid;     // pre-computed: reg_write & (rd != x0)
 
-    // WB output — direct from pre-computed register (no combinational mux)
-    wire [31:0] wb_write_data = memwb_write_data;
+    // WB output — combinational from stage_wb (sign ext + WB mux)
+    wire [31:0] wb_write_data;
 
     // Hazard / forwarding
     wire        hz_stall;            // load-use hazard stall
@@ -110,7 +111,7 @@ module cpu_core (
     //   - Active the cycle AFTER EX/MEM latches a LOAD (before bram_wait captures 1)
     //   - Deasserts once bram_wait=1 so pipeline resumes the next cycle
     reg bram_wait;
-    always @(posedge clk) begin
+    always @(posedge cpu_clk) begin
         if (cpu_rst)    bram_wait <= 1'b0;
         else if (bram_wait) bram_wait <= 1'b0;   // self-clearing after 1 cycle
         else            bram_wait <= exmem_mem_read;
@@ -340,6 +341,7 @@ module cpu_core (
         .exmem_reg_write(exmem_reg_write),
         .memwb_rd_addr  (memwb_rd_addr),
         .memwb_reg_write(memwb_reg_write),
+        .memwb_fwd_valid(memwb_fwd_valid),
         .forward_a      (forward_a),
         .forward_b      (forward_b)
     );
@@ -450,19 +452,30 @@ module cpu_core (
         .mem_rd_addr     (exmem_rd_addr),
         .mem_reg_write   (exmem_reg_write),
         .mem_wb_sel      (exmem_wb_sel),
+        .mem_mem_funct3  (exmem_mem_funct3),
         .memwb_pc_plus4  (memwb_pc_plus4),
         .memwb_alu_result(memwb_alu_result),
         .memwb_mem_data  (memwb_mem_data),
         .memwb_rd_addr   (memwb_rd_addr),
         .memwb_reg_write (memwb_reg_write),
         .memwb_wb_sel    (memwb_wb_sel),
-        .memwb_write_data(memwb_write_data)
+        .memwb_mem_funct3(memwb_mem_funct3),
+        .memwb_fwd_valid (memwb_fwd_valid)
     );
 
     // -------------------------------------------------------------------
-    // Stage 5: WB — pre-computed in pipe_memwb as memwb_write_data.
-    // The old stage_wb 3:1 mux is absorbed into the MEM/WB register,
-    // so wb_write_data is now a direct register output (see wire decl above).
+    // Stage 5: WB — sign extension + write-back mux.
+    // Sign extension was moved here from stage_mem to shorten the MEM-stage
+    // critical path (DRAM read → pipe_memwb register).  All stage_wb inputs
+    // are registered outputs of pipe_memwb.
     // -------------------------------------------------------------------
+    stage_wb u_wb (
+        .memwb_alu_result (memwb_alu_result),
+        .memwb_mem_data   (memwb_mem_data),
+        .memwb_pc_plus4   (memwb_pc_plus4),
+        .memwb_wb_sel     (memwb_wb_sel),
+        .memwb_mem_funct3 (memwb_mem_funct3),
+        .wb_write_data    (wb_write_data)
+    );
 
 endmodule

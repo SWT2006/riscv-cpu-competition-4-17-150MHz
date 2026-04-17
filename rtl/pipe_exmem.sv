@@ -20,7 +20,7 @@ module pipe_exmem (
     input  wire [1:0]  ex_wb_sel,
     // Outputs to MEM / forwarding
     output reg  [31:0] exmem_pc_plus4,
-    output reg  [31:0] exmem_alu_result,
+    (* max_fanout = 128 *) output reg  [31:0] exmem_alu_result,
     output reg  [31:0] exmem_rs2_data,
     output reg  [4:0]  exmem_rd_addr,
     output reg         exmem_mem_read,
