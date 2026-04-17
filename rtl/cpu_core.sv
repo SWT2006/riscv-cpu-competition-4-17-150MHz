@@ -102,8 +102,23 @@ module cpu_core (
     // -------------------------------------------------------------------
     // Combined EX-stage stall (divide or pipelined multiply)
     wire ex_stall = div_stall | mul_stall;
-    // Combined stall: load-use hazard OR EX multi-cycle operation
-    wire pipeline_stall = hz_stall | ex_stall;
+
+    // BRAM read-latency stall: synchronous BRAM needs 1 extra cycle after
+    // EX/MEM latches to produce valid read data.
+    // bram_wait: cleared immediately; set for 1 cycle when LOAD enters MEM.
+    // bram_stall = exmem_mem_read & ~bram_wait:
+    //   - Active the cycle AFTER EX/MEM latches a LOAD (before bram_wait captures 1)
+    //   - Deasserts once bram_wait=1 so pipeline resumes the next cycle
+    reg bram_wait;
+    always @(posedge clk) begin
+        if (cpu_rst)    bram_wait <= 1'b0;
+        else if (bram_wait) bram_wait <= 1'b0;   // self-clearing after 1 cycle
+        else            bram_wait <= exmem_mem_read;
+    end
+    wire bram_stall = exmem_mem_read & ~bram_wait;
+
+    // Combined stall: load-use hazard OR EX multi-cycle operation OR BRAM wait
+    wire pipeline_stall = hz_stall | ex_stall | bram_stall;
 
     // -----------------------------------------------------------------
     // Mispredict detection (unified for all prediction sources)
@@ -251,13 +266,14 @@ module cpu_core (
     // -------------------------------------------------------------------
     // ID/EX register
     // flush: load-use stall inserts NOP bubble, branch flush inserts NOP.
-    // hold:  multi-cycle EX op keeps the instruction in EX (div or mul).
+    //        Suppressed during bram_stall to avoid corrupting held state.
+    // hold:  multi-cycle EX op or BRAM stall keeps the instruction in EX.
     // -------------------------------------------------------------------
     pipe_idex u_pipe_idex (
         .clk            (cpu_clk),
         .cpu_rst        (cpu_rst),
-        .flush          (hz_stall | flush),   // stall inserts NOP bubble in EX
-        .hold           (ex_stall),           // keep div/mul instruction in EX
+        .flush          ((hz_stall | flush) & ~bram_stall),
+        .hold           (ex_stall | bram_stall),
         .id_pc          (ifid_pc),
         .id_pc_plus4    (ifid_pc_plus4),
         .id_rs1_data    (id_rs1_data),
@@ -375,13 +391,14 @@ module cpu_core (
 
     // -------------------------------------------------------------------
     // EX/MEM register
-    // flush: insert NOP bubble while EX multi-cycle op is active (prevent
-    //        false stores/loads/writes from incomplete results).
+    // flush: insert NOP bubble while EX multi-cycle op is active.
+    // hold:  freeze during BRAM stall so the LOAD stays in MEM.
     // -------------------------------------------------------------------
     pipe_exmem u_pipe_exmem (
         .clk              (cpu_clk),
         .cpu_rst          (cpu_rst),
-        .flush            (ex_stall),
+        .flush            (ex_stall & ~bram_stall),
+        .hold             (bram_stall),
         .ex_pc_plus4      (idex_pc_plus4),
         .ex_alu_result    (ex_alu_result),
         .ex_rs2_data      (ex_rs2_data_fwd),
@@ -426,6 +443,7 @@ module cpu_core (
     pipe_memwb u_pipe_memwb (
         .clk             (cpu_clk),
         .cpu_rst         (cpu_rst),
+        .hold            (bram_stall),
         .mem_pc_plus4    (exmem_pc_plus4),
         .mem_alu_result  (exmem_alu_result),
         .mem_read_data   (mem_read_data),

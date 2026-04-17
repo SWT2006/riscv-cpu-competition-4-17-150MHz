@@ -7,6 +7,7 @@ module pipe_exmem (
     input  wire        clk,
     input  wire        cpu_rst,
     input  wire        flush,         // insert NOP bubble (e.g. div_stall)
+    input  wire        hold,          // freeze register (e.g. bram_stall)
     // Inputs from EX
     input  wire [31:0] ex_pc_plus4,
     input  wire [31:0] ex_alu_result,
@@ -43,7 +44,7 @@ module pipe_exmem (
             exmem_reg_write   <= 1'b0;
             exmem_wb_sel      <= 2'b0;
             exmem_fwd_data    <= 32'b0;
-        end else begin
+        end else if (!hold) begin
             exmem_pc_plus4    <= ex_pc_plus4;
             exmem_alu_result  <= ex_alu_result;
             exmem_rs2_data    <= ex_rs2_data;

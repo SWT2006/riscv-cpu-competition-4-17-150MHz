@@ -6,6 +6,7 @@
 module pipe_memwb (
     input  wire        clk,
     input  wire        cpu_rst,
+    input  wire        hold,          // freeze register (bram_stall)
     // Inputs from MEM
     input  wire [31:0] mem_pc_plus4,
     input  wire [31:0] mem_alu_result,
@@ -33,7 +34,7 @@ module pipe_memwb (
             memwb_reg_write  <= 1'b0;
             memwb_wb_sel     <= 2'b0;
             memwb_write_data <= 32'b0;
-        end else begin
+        end else if (!hold) begin
             memwb_pc_plus4   <= mem_pc_plus4;
             memwb_alu_result <= mem_alu_result;
             memwb_mem_data   <= mem_read_data;

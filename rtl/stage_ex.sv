@@ -85,34 +85,53 @@ module stage_ex (
     localparam ALU_REMU   = 5'd18;
 
     // ---------------------------------------------------------------
-    // Forwarding muxes
-    // exmem_fwd_data is pre-computed in pipe_exmem:
-    //   (wb_sel==2'b10) ? pc_plus4 : alu_result
-    // This saves one mux level compared to the old exmem_fwd.
+    // Forwarding muxes — split into two independent copies per operand
+    // to reduce forward_a/forward_b fanout from 32 to 16 per copy.
+    //   fwd_a_alu  / fwd_b_alu  : ALU path (arithmetic, logic, shift, MUL)
+    //   fwd_a_misc / fwd_b_misc : JALR, branch compare, CSR write, store data
+    // (* keep = "true" *) prevents Vivado merging identical always blocks.
     // ---------------------------------------------------------------
-    reg [31:0] fwd_a, fwd_b;
+    (* keep = "true" *) reg [31:0] fwd_a_alu;
+    (* keep = "true" *) reg [31:0] fwd_a_misc;
     always @(*) begin
         case (forward_a)
-            2'b10:   fwd_a = exmem_fwd_data;
-            2'b01:   fwd_a = wb_write_data;
-            default: fwd_a = idex_rs1_data;
+            2'b10:   fwd_a_alu = exmem_fwd_data;
+            2'b01:   fwd_a_alu = wb_write_data;
+            default: fwd_a_alu = idex_rs1_data;
+        endcase
+    end
+    always @(*) begin
+        case (forward_a)
+            2'b10:   fwd_a_misc = exmem_fwd_data;
+            2'b01:   fwd_a_misc = wb_write_data;
+            default: fwd_a_misc = idex_rs1_data;
+        endcase
+    end
+
+    (* keep = "true" *) reg [31:0] fwd_b_alu;
+    (* keep = "true" *) reg [31:0] fwd_b_misc;
+    always @(*) begin
+        case (forward_b)
+            2'b10:   fwd_b_alu = exmem_fwd_data;
+            2'b01:   fwd_b_alu = wb_write_data;
+            default: fwd_b_alu = idex_rs2_data;
         endcase
     end
     always @(*) begin
         case (forward_b)
-            2'b10:   fwd_b = exmem_fwd_data;
-            2'b01:   fwd_b = wb_write_data;
-            default: fwd_b = idex_rs2_data;
+            2'b10:   fwd_b_misc = exmem_fwd_data;
+            2'b01:   fwd_b_misc = wb_write_data;
+            default: fwd_b_misc = idex_rs2_data;
         endcase
     end
 
-    assign rs2_data_fwd = fwd_b;
+    assign rs2_data_fwd = fwd_b_misc;
 
     // ---------------------------------------------------------------
-    // ALU operand selection
+    // ALU operand selection (uses _alu copies, keeps placement local)
     // ---------------------------------------------------------------
-    wire [31:0] alu_a = idex_auipc ? idex_pc  : fwd_a;
-    wire [31:0] alu_b = idex_alu_src ? idex_imm : fwd_b;
+    wire [31:0] alu_a = idex_auipc ? idex_pc  : fwd_a_alu;
+    wire [31:0] alu_b = idex_alu_src ? idex_imm : fwd_b_alu;
 
     // ---------------------------------------------------------------
     // Consolidated multiply (single 33×33 signed → 66-bit product)
@@ -253,12 +272,12 @@ module stage_ex (
     reg branch_cond;
     always @(*) begin
         case (idex_funct3)
-            3'b000:  branch_cond = (fwd_a == fwd_b);                   // BEQ
-            3'b001:  branch_cond = (fwd_a != fwd_b);                   // BNE
-            3'b100:  branch_cond = ($signed(fwd_a) < $signed(fwd_b));  // BLT
-            3'b101:  branch_cond = ($signed(fwd_a) >= $signed(fwd_b)); // BGE
-            3'b110:  branch_cond = (fwd_a < fwd_b);                    // BLTU
-            3'b111:  branch_cond = (fwd_a >= fwd_b);                   // BGEU
+            3'b000:  branch_cond = (fwd_a_misc == fwd_b_misc);                   // BEQ
+            3'b001:  branch_cond = (fwd_a_misc != fwd_b_misc);                   // BNE
+            3'b100:  branch_cond = ($signed(fwd_a_misc) < $signed(fwd_b_misc));  // BLT
+            3'b101:  branch_cond = ($signed(fwd_a_misc) >= $signed(fwd_b_misc)); // BGE
+            3'b110:  branch_cond = (fwd_a_misc < fwd_b_misc);                    // BLTU
+            3'b111:  branch_cond = (fwd_a_misc >= fwd_b_misc);                   // BGEU
             default: branch_cond = 1'b0;
         endcase
     end
@@ -267,7 +286,7 @@ module stage_ex (
     // Branch / jump targets
     // ---------------------------------------------------------------
     wire [31:0] pc_branch = idex_pc + idex_imm;
-    wire [31:0] jalr_tgt  = (fwd_a + idex_imm) & 32'hFFFF_FFFE;
+    wire [31:0] jalr_tgt  = (fwd_a_misc + idex_imm) & 32'hFFFF_FFFE;
 
     assign branch_taken  = idex_jal | idex_jalr | (idex_branch & branch_cond)
                          | idex_ecall | idex_mret;
@@ -293,13 +312,13 @@ module stage_ex (
     reg [31:0] csr_wd;
     always @(*) begin
         case (idex_funct3)
-            3'b001: csr_wd = fwd_a;                          // CSRRW
-            3'b010: csr_wd = idex_csr_rdata | fwd_a;        // CSRRS
-            3'b011: csr_wd = idex_csr_rdata & ~fwd_a;       // CSRRC
-            3'b101: csr_wd = zimm;                            // CSRRWI
-            3'b110: csr_wd = idex_csr_rdata | zimm;          // CSRRSI
-            3'b111: csr_wd = idex_csr_rdata & ~zimm;         // CSRRCI
-            default: csr_wd = fwd_a;
+            3'b001: csr_wd = fwd_a_misc;                          // CSRRW
+            3'b010: csr_wd = idex_csr_rdata | fwd_a_misc;        // CSRRS
+            3'b011: csr_wd = idex_csr_rdata & ~fwd_a_misc;       // CSRRC
+            3'b101: csr_wd = zimm;                                // CSRRWI
+            3'b110: csr_wd = idex_csr_rdata | zimm;              // CSRRSI
+            3'b111: csr_wd = idex_csr_rdata & ~zimm;             // CSRRCI
+            default: csr_wd = fwd_a_misc;
         endcase
     end
 
